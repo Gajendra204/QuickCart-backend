@@ -1,19 +1,19 @@
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
-const multer = require('multer');
-const mongoose = require('mongoose');
-const Shopkeeper = require('../models/Shopkeeper');
-const Store = require('../models/Store');
-const Item = require('../models/Item');
-const Category = require('../models/category');
-const fs = require('fs');
-const path = require('path');
-const bwipjs = require('bwip-js');
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+const multer = require("multer");
+const mongoose = require("mongoose");
+const Shopkeeper = require("../models/Shopkeeper");
+const Store = require("../models/Store");
+const Item = require("../models/Item");
+const Category = require("../models/category");
+const fs = require("fs");
+const path = require("path");
+const bwipjs = require("bwip-js");
 
 // Image upload setup
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, 'uploads/'),
-  filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname)
+  destination: (req, file, cb) => cb(null, "uploads/"),
+  filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname),
 });
 exports.upload = multer({ storage });
 
@@ -22,10 +22,14 @@ exports.register = async (req, res) => {
   try {
     const { name, email, password } = req.body;
     const hashedPassword = await bcrypt.hash(password, 10);
-    console.log('aajaya ree')
-    const shopkeeper = new Shopkeeper({ name, email, password: hashedPassword });
+    console.log("aajaya ree");
+    const shopkeeper = new Shopkeeper({
+      name,
+      email,
+      password: hashedPassword,
+    });
     await shopkeeper.save();
-    res.status(201).json({ message: 'Shopkeeper created' });
+    res.status(201).json({ message: "Shopkeeper created" });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -34,10 +38,11 @@ exports.register = async (req, res) => {
 // Shopkeeper Login
 exports.login = async (req, res) => {
   try {
+    console.log("Request reached here in login,", req.body);
     const { email, password } = req.body;
     const shopkeeper = await Shopkeeper.findOne({ email });
-    if (!shopkeeper || !await bcrypt.compare(password, shopkeeper.password)) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+    if (!shopkeeper || !(await bcrypt.compare(password, shopkeeper.password))) {
+      return res.status(401).json({ error: "Invalid credentials" });
     }
     const token = jwt.sign({ id: shopkeeper._id }, process.env.JWT_SECRET);
     res.json({ token });
@@ -62,26 +67,31 @@ exports.createStore = async (req, res) => {
 
     // Generate barcode image
     const barcodeData = store._id.toString(); // Use store ID as barcode data
-    const barcodeImagePath = path.join(__dirname, `../public/barcodes/${store._id}.png`);
+    const barcodeImagePath = path.join(
+      __dirname,
+      `../public/barcodes/${store._id}.png`
+    );
 
     // Ensure the "public/barcodes" directory exists
-    if (!fs.existsSync(path.join(__dirname, '../public/barcodes'))) {
-      fs.mkdirSync(path.join(__dirname, '../public/barcodes'), { recursive: true });
+    if (!fs.existsSync(path.join(__dirname, "../public/barcodes"))) {
+      fs.mkdirSync(path.join(__dirname, "../public/barcodes"), {
+        recursive: true,
+      });
     }
 
     bwipjs.toBuffer(
       {
-        bcid: 'code128', // Barcode type
+        bcid: "code128", // Barcode type
         text: barcodeData, // Data to encode
         scale: 3, // Scaling factor
         height: 10, // Barcode height
         includetext: true, // Include human-readable text
-        textxalign: 'center', // Center-align text
+        textxalign: "center", // Center-align text
       },
       async (err, png) => {
         if (err) {
-          console.error('Error generating barcode:', err);
-          return res.status(500).json({ error: 'Failed to generate barcode' });
+          console.error("Error generating barcode:", err);
+          return res.status(500).json({ error: "Failed to generate barcode" });
         }
 
         // Save the barcode image to the public folder
@@ -91,7 +101,8 @@ exports.createStore = async (req, res) => {
         store.barcodeImage = `/barcodes/${store._id}.png`;
         await store.save();
         res.status(201).json(store);
-      });
+      }
+    );
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -113,7 +124,7 @@ exports.createItem = async (req, res) => {
   try {
     const item = new Item({
       ...req.body,
-      image: req.file ? req.file.path : null
+      image: req.file ? req.file.path : null,
     });
     await item.save();
     res.status(201).json(item);
