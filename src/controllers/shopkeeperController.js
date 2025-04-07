@@ -9,6 +9,7 @@ const Category = require("../models/category");
 const fs = require("fs");
 const path = require("path");
 const bwipjs = require("bwip-js");
+const Order = require("../models/Order"); // Ensure correct path
 
 // Image upload setup
 const storage = multer.diskStorage({
@@ -20,6 +21,7 @@ exports.upload = multer({ storage });
 // Shopkeeper Registration
 exports.register = async (req, res) => {
   try {
+    console.log("Ha bhai athe aa giyo");
     const { name, email, password } = req.body;
     const hashedPassword = await bcrypt.hash(password, 10);
     console.log("aajaya ree");
@@ -128,6 +130,57 @@ exports.createItem = async (req, res) => {
     });
     await item.save();
     res.status(201).json(item);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+// Get Orders by Shopkeeper (for shopkeepers)
+exports.getShopkeeperOrders = async (req, res) => {
+  try {
+    console.log("Fetching orders for shopkeeper:", req.shopkeeper._id);
+    // Find all stores owned by this shopkeeper
+    const stores = await Store.find({ shopkeeper: req.shopkeeper._id });
+    // console.log("Shopkeeper's stores:", stores);
+    const storeIds = stores.map((store) => store._id);
+
+    // Find all orders for these stores
+    const orders = await Order.find({ store: { $in: storeIds } })
+      .populate("store", "name")
+      .populate("items.item", "name mrp discount");
+
+    res.json(orders);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+exports.updateOrderStatus = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { status } = req.body;
+    console.log("Updating order status:", orderId, status);
+    // Verify the order belongs to this shopkeeper's store
+    const order = await Order.findById(orderId).populate("store");
+    if (!order) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    const store = await Store.findOne({
+      _id: order.store._id,
+      shopkeeper: req.shopkeeper._id,
+    });
+
+    if (!store) {
+      return res
+        .status(403)
+        .json({ error: "Not authorized to update this order" });
+    }
+
+    order.status = status;
+    await order.save();
+
+    res.json(order);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

@@ -23,7 +23,7 @@ exports.getStoreByBarcode = async (req, res) => {
     const items = await Item.find({
       store: store._id,
     });
-    
+
     res.json({
       store,
       categories,
@@ -37,7 +37,7 @@ exports.getStoreByBarcode = async (req, res) => {
 // Get Categories by Store
 exports.getCategoriesByStore = async (req, res) => {
   try {
-    const categories = await category.find({ store: req.params.storeId });
+    const categories = await Category.find({ store: req.params.storeId });
     res.json(categories);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -79,6 +79,24 @@ exports.createOrder = async (req, res) => {
     await order.save();
     res.status(201).json(order);
   } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+exports.getOrdersByMobile = async (req, res) => {
+  try {
+    const { mobile } = req.params;
+    console.log("Searching for mobile:", mobile);
+
+    // Option 1: Strict string match
+    const orders = await Order.find({ mobile: String(mobile) })
+      .populate("store", "name")
+      .populate("items.item", "name mrp discount");
+
+    console.log("Found orders:", orders); // Debug output
+    res.json(orders);
+  } catch (err) {
+    console.error("Error:", err);
     res.status(400).json({ error: err.message });
   }
 };
