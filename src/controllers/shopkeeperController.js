@@ -102,7 +102,9 @@ exports.createStore = async (req, res) => {
         // Update the store with the barcode image URL
         store.barcodeImage = `/barcodes/${store._id}.png`;
         await store.save();
-        res.status(201).json(store);
+        const populatedStore = await Store.findById(store._id).populate('shopkeeper');
+        res.status(201).json(populatedStore);
+        // res.status(201).json(store);
       }
     );
   } catch (err) {
@@ -117,7 +119,9 @@ exports.createCategory = async (req, res) => {
     await category.save();
     res.status(201).json(category);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    const populatedCategory = await Category.findById(category._id).populate('store');
+    res.status(201).json(populatedCategory);
+    // res.status(400).json({ error: err.message });
   }
 };
 
@@ -131,7 +135,11 @@ exports.createItem = async (req, res) => {
     await item.save();
     res.status(201).json(item);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    const populatedItem = await Item.findById(item._id)
+    .populate('category')
+    .populate('store');
+  res.status(201).json(populatedItem);
+    // res.status(400).json({ error: err.message });
   }
 };
 
@@ -184,4 +192,220 @@ exports.updateOrderStatus = async (req, res) => {
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
+};
+
+
+exports.getStores = async (req, res) => {
+  try {
+    const stores = await Store.find({ shopkeeper: req.shopkeeper._id });
+    res.json(stores);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+// Get single store by ID
+exports.getStoreById = async (req, res) => {
+  try {
+    const store = await Store.findOne({
+      _id: req.params.id,
+      shopkeeper: req.shopkeeper._id
+    });
+    if (!store) {
+      return res.status(404).json({ error: 'Store not found' });
+    }
+    res.json(store);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+// Get all categories
+exports.getCategories = async (req, res) => {
+  try {
+    // First get all stores belonging to this shopkeeper
+    const stores = await Store.find({ shopkeeper: req.shopkeeper._id });
+    const storeIds = stores.map(store => store._id);
+    
+    // Then get all categories for these stores
+    const categories = await Category.find({ store: { $in: storeIds } });
+    res.json(categories);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+// Get single category by ID
+exports.getCategoryById = async (req, res) => {
+  try {
+    // First verify the category belongs to a store owned by this shopkeeper
+    const category = await Category.findById(req.params.id).populate('store');
+    if (!category) {
+      return res.status(404).json({ error: 'Category not found' });
+    }
+    
+    const store = await Store.findOne({
+      _id: category.store._id,
+      shopkeeper: req.shopkeeper._id
+    });
+    
+    if (!store) {
+      return res.status(403).json({ error: 'Not authorized to access this category' });
+    }
+    
+    res.json(category);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+// Get categories by store
+exports.getCategoriesByStore = async (req, res) => {
+  try {
+    // First verify the store belongs to this shopkeeper
+    const store = await Store.findOne({
+      _id: req.params.storeId,
+      shopkeeper: req.shopkeeper._id
+    });
+    
+    if (!store) {
+      return res.status(403).json({ error: 'Not authorized to access this store' });
+    }
+    
+    const categories = await Category.find({ store: store._id });
+    res.json(categories);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+// Get all items
+exports.getItems = async (req, res) => {
+  try {
+    // First get all stores belonging to this shopkeeper
+    const stores = await Store.find({ shopkeeper: req.shopkeeper._id });
+    const storeIds = stores.map(store => store._id);
+    
+    // Then get all items for these stores
+    const items = await Item.find({ store: { $in: storeIds } })
+      .populate('category')
+      .populate('store');
+    res.json(items);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+// Get single item by ID
+exports.getItemById = async (req, res) => {
+  try {
+    // First verify the item belongs to a store owned by this shopkeeper
+    const item = await Item.findById(req.params.id)
+      .populate('category')
+      .populate('store');
+    
+    if (!item) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+    
+    const store = await Store.findOne({
+      _id: item.store._id,
+      shopkeeper: req.shopkeeper._id
+    });
+    
+    if (!store) {
+      return res.status(403).json({ error: 'Not authorized to access this item' });
+    }
+    
+    res.json(item);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+// Get items by category
+exports.getItemsByCategory = async (req, res) => {
+  try {
+    // First verify the category belongs to a store owned by this shopkeeper
+    const category = await Category.findById(req.params.categoryId).populate('store');
+    if (!category) {
+      return res.status(404).json({ error: 'Category not found' });
+    }
+    
+    const store = await Store.findOne({
+      _id: category.store._id,
+      shopkeeper: req.shopkeeper._id
+    });
+    
+    if (!store) {
+      return res.status(403).json({ error: 'Not authorized to access this category' });
+    }
+    
+    const items = await Item.find({ category: category._id })
+      .populate('category')
+      .populate('store');
+    res.json(items);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+
+  // exports.deleteStore = async (req, res) => {
+  //   try {
+  //     const store = await Store.findOneAndDelete({
+  //       _id: req.params.id,
+  //       shopkeeper: req.shopkeeper._id
+  //     });
+      
+  //     if (!store) {
+  //       return res.status(404).json({ error: 'Store not found or not authorized' });
+  //     }
+      
+  //     // Delete associated categories and items
+  //     await Category.deleteMany({ store: req.params.id });
+  //     await Item.deleteMany({ store: req.params.id });
+      
+  //     res.json({ message: 'Store and its contents deleted successfully' });
+  //   } catch (err) {
+  //     res.status(400).json({ error: err.message });
+  //   }
+  // };
+  
+  // // Delete Category
+  // exports.deleteCategory = async (req, res) => {
+  //   try {
+  //     const category = await Category.findOneAndDelete({
+  //       _id: req.params.id,
+  //       store: { $in: await Store.find({ shopkeeper: req.shopkeeper._id }).distinct('_id') }
+  //     });
+      
+  //     if (!category) {
+  //       return res.status(404).json({ error: 'Category not found or not authorized' });
+  //     }
+      
+  //     // Delete associated items
+  //     await Item.deleteMany({ category: req.params.id });
+      
+  //     res.json({ message: 'Category and its items deleted successfully' });
+  //   } catch (err) {
+  //     res.status(400).json({ error: err.message });
+  //   }
+  // };
+  
+  // // Delete Item
+  // exports.deleteItem = async (req, res) => {
+  //   try {
+  //     const item = await Item.findOneAndDelete({
+  //       _id: req.params.id,
+  //       store: { $in: await Store.find({ shopkeeper: req.shopkeeper._id }).distinct('_id') }
+  //     });
+      
+  //     if (!item) {
+  //       return res.status(404).json({ error: 'Item not found or not authorized' });
+  //     }
+      
+  //     res.json({ message: 'Item deleted successfully' });
+  //   } catch (err) {
+  //     res.status(400).json({ error: err.message });
+  //   }
+  // };
 };

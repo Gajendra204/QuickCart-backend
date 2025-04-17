@@ -1,12 +1,12 @@
 {
   "name": "quickcart",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "app.js",
   "module": "",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start:debug": "node server.js --watch",
-    "start": "node server.js"
+    "start": "node app.js"
   },
   "author": "",
   "license": "ISC",
