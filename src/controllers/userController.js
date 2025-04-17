@@ -3,7 +3,7 @@ const Store = require("../models/Store");
 
 const Item = require("../models/Item");
 const Order = require("../models/Order");
-const Category = require("../models/category");
+const Category = require("../models/Category");
 
 // Get Store by Barcode
 exports.getStoreByBarcode = async (req, res) => {
