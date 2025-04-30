@@ -360,64 +360,190 @@ exports.getItemsByCategory = async (req, res) => {
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
+};
 
-  // exports.deleteStore = async (req, res) => {
-  //   try {
-  //     const store = await Store.findOneAndDelete({
-  //       _id: req.params.id,
-  //       shopkeeper: req.shopkeeper._id
-  //     });
+// Update Store
+exports.updateStore = async (req, res) => {
+  try {
+    const { name, address } = req.body;
 
-  //     if (!store) {
-  //       return res.status(404).json({ error: 'Store not found or not authorized' });
-  //     }
+    // First verify the store belongs to this shopkeeper
+    const store = await Store.findOne({
+      _id: req.params.id,
+      shopkeeper: req.shopkeeper._id,
+    });
 
-  //     // Delete associated categories and items
-  //     await Category.deleteMany({ store: req.params.id });
-  //     await Item.deleteMany({ store: req.params.id });
+    if (!store) {
+      return res
+        .status(404)
+        .json({ error: "Store not found or not authorized" });
+    }
 
-  //     res.json({ message: 'Store and its contents deleted successfully' });
-  //   } catch (err) {
-  //     res.status(400).json({ error: err.message });
-  //   }
-  // };
+    const updatedStore = await Store.findByIdAndUpdate(
+      req.params.id,
+      { name, address },
+      { new: true }
+    ).populate("shopkeeper");
 
-  // // Delete Category
-  // exports.deleteCategory = async (req, res) => {
-  //   try {
-  //     const category = await Category.findOneAndDelete({
-  //       _id: req.params.id,
-  //       store: { $in: await Store.find({ shopkeeper: req.shopkeeper._id }).distinct('_id') }
-  //     });
+    if (!updatedStore) {
+      return res.status(404).json({ error: "Store not found" });
+    }
 
-  //     if (!category) {
-  //       return res.status(404).json({ error: 'Category not found or not authorized' });
-  //     }
+    res.json(updatedStore);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
 
-  //     // Delete associated items
-  //     await Item.deleteMany({ category: req.params.id });
+// Update Item
+exports.updateItem = async (req, res) => {
+  try {
+    const { name, description, mrp, discount, category, store } = req.body;
 
-  //     res.json({ message: 'Category and its items deleted successfully' });
-  //   } catch (err) {
-  //     res.status(400).json({ error: err.message });
-  //   }
-  // };
+    // First verify the item belongs to a store owned by this shopkeeper
+    const existingItem = await Item.findById(req.params.id);
+    if (!existingItem) {
+      return res.status(404).json({ error: "Item not found" });
+    }
 
-  // // Delete Item
-  // exports.deleteItem = async (req, res) => {
-  //   try {
-  //     const item = await Item.findOneAndDelete({
-  //       _id: req.params.id,
-  //       store: { $in: await Store.find({ shopkeeper: req.shopkeeper._id }).distinct('_id') }
-  //     });
+    const storeCheck = await Store.findOne({
+      _id: existingItem.store,
+      shopkeeper: req.shopkeeper._id,
+    });
 
-  //     if (!item) {
-  //       return res.status(404).json({ error: 'Item not found or not authorized' });
-  //     }
+    if (!storeCheck) {
+      return res
+        .status(403)
+        .json({ error: "Not authorized to update this item" });
+    }
 
-  //     res.json({ message: 'Item deleted successfully' });
-  //   } catch (err) {
-  //     res.status(400).json({ error: err.message });
-  //   }
-  // };
+    const updatedItem = await Item.findByIdAndUpdate(
+      req.params.id,
+      { name, description, mrp, discount, category, store },
+      { new: true }
+    )
+      .populate("category")
+      .populate("store");
+
+    if (!updatedItem) {
+      return res.status(404).json({ error: "Item not found" });
+    }
+
+    res.json(updatedItem);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+// Delete Item
+exports.deleteItem = async (req, res) => {
+  try {
+    const item = await Item.findOneAndDelete({
+      _id: req.params.id,
+      store: {
+        $in: await Store.find({ shopkeeper: req.shopkeeper._id }).distinct(
+          "_id"
+        ),
+      },
+    });
+
+    if (!item) {
+      return res
+        .status(404)
+        .json({ error: "Item not found or not authorized" });
+    }
+
+    res.json({ message: "Item deleted successfully" });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+// Update Category
+exports.updateCategory = async (req, res) => {
+  try {
+    const { name, store } = req.body;
+
+    // First verify the category belongs to a store owned by this shopkeeper
+    const existingCategory = await Category.findById(req.params.id);
+    if (!existingCategory) {
+      return res.status(404).json({ error: "Category not found" });
+    }
+
+    const storeCheck = await Store.findOne({
+      _id: existingCategory.store,
+      shopkeeper: req.shopkeeper._id,
+    });
+
+    if (!storeCheck) {
+      return res
+        .status(403)
+        .json({ error: "Not authorized to update this category" });
+    }
+
+    const updatedCategory = await Category.findByIdAndUpdate(
+      req.params.id,
+      { name, store },
+      { new: true }
+    ).populate("store");
+
+    if (!updatedCategory) {
+      return res.status(404).json({ error: "Category not found" });
+    }
+
+    res.json(updatedCategory);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+// Delete Category
+exports.deleteCategory = async (req, res) => {
+  try {
+    const category = await Category.findOneAndDelete({
+      _id: req.params.id,
+      store: {
+        $in: await Store.find({ shopkeeper: req.shopkeeper._id }).distinct(
+          "_id"
+        ),
+      },
+    });
+
+    if (!category) {
+      return res
+        .status(404)
+        .json({ error: "Category not found or not authorized" });
+    }
+
+    // Delete associated items
+    await Item.deleteMany({ category: req.params.id });
+
+    res.json({ message: "Category and its items deleted successfully" });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+// Delete Store
+exports.deleteStore = async (req, res) => {
+  try {
+    const store = await Store.findOneAndDelete({
+      _id: req.params.id,
+      shopkeeper: req.shopkeeper._id,
+    });
+
+    if (!store) {
+      return res
+        .status(404)
+        .json({ error: "Store not found or not authorized" });
+    }
+
+    // Delete associated categories and items
+    await Category.deleteMany({ store: req.params.id });
+    await Item.deleteMany({ store: req.params.id });
+
+    res.json({ message: "Store and its contents deleted successfully" });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 };
