@@ -3,6 +3,9 @@ const router = express.Router();
 const {
   register,
   login,
+  forgotPassword,
+  verifyResetToken,
+  resetPassword,
   createStore,
   updateStore,
   deleteStore,
@@ -29,6 +32,9 @@ const auth = require("../middleware/auth");
 // Public routes
 router.post("/register", register);
 router.post("/login", login);
+router.post("/forgot-password", forgotPassword);
+router.get("/reset-password/:token", verifyResetToken);
+router.post("/reset-password/:token", resetPassword);
 
 // Protected routes
 router.use(auth);

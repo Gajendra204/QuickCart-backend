@@ -10,6 +10,7 @@ const fs = require("fs");
 const path = require("path");
 const bwipjs = require("bwip-js");
 const Order = require("../models/Order"); // Ensure correct path
+const { sendPasswordResetEmail } = require("../services/emailService");
 
 // Image upload setup
 const storage = multer.diskStorage({
@@ -50,6 +51,99 @@ exports.login = async (req, res) => {
     res.json({ token });
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+};
+
+// Forgot Password
+exports.forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const shopkeeper = await Shopkeeper.findOne({ email });
+
+    if (!shopkeeper) {
+      return res
+        .status(404)
+        .json({ error: "No account found with this email" });
+    }
+
+    // Generate a password reset token
+    const resetToken = jwt.sign(
+      { id: shopkeeper._id },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" }
+    );
+
+    // Save the reset token and its expiry to the shopkeeper document
+    shopkeeper.resetPasswordToken = resetToken;
+    shopkeeper.resetPasswordExpires = Date.now() + 3600000; // 1 hour
+    await shopkeeper.save();
+
+    // Create reset URL
+    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+
+    // Send password reset email
+    await sendPasswordResetEmail(email, resetUrl);
+
+    res.json({
+      message: "Password reset link has been sent to your email",
+    });
+  } catch (err) {
+    console.error("Forgot password error:", err);
+    res.status(400).json({ error: "Password reset request failed" });
+  }
+};
+
+// Verify Reset Token
+exports.verifyResetToken = async (req, res) => {
+  try {
+    const { token } = req.params;
+
+    const shopkeeper = await Shopkeeper.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: Date.now() },
+    });
+
+    if (!shopkeeper) {
+      return res
+        .status(400)
+        .json({ error: "Password reset token is invalid or has expired" });
+    }
+
+    res.json({ message: "Token is valid", email: shopkeeper.email });
+  } catch (err) {
+    res.status(400).json({ error: "Token verification failed" });
+  }
+};
+
+// Reset Password
+exports.resetPassword = async (req, res) => {
+  try {
+    const { token } = req.params;
+    const { password } = req.body;
+
+    const shopkeeper = await Shopkeeper.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: Date.now() },
+    });
+
+    if (!shopkeeper) {
+      return res
+        .status(400)
+        .json({ error: "Password reset token is invalid or has expired" });
+    }
+
+    // Hash the new password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Update password and clear reset token fields
+    shopkeeper.password = hashedPassword;
+    shopkeeper.resetPasswordToken = undefined;
+    shopkeeper.resetPasswordExpires = undefined;
+    await shopkeeper.save();
+
+    res.json({ message: "Password has been reset successfully" });
+  } catch (err) {
+    res.status(400).json({ error: "Password reset failed" });
   }
 };
 
